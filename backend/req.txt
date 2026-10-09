@@ -1,0 +1,12 @@
+Add a Company Documents feature to the app.
+Create a /documents page where users can upload and manage company knowledge documents (PDF, DOCX, TXT).  
+Features:
+- Upload document with title/name
+- Show document list with status, upload date, and delete action
+- Process documents into chunks and embeddings using the existing RAG pipeline (all-MiniLM-L6-v2 + pgvector)
+- Ensure documents are strictly scoped to the logged-in companyId
+- Make the existing Company Docs AI tab retrieve answers from these uploaded documents
+- Show proper loading, processing, success, and error states
+- Reuse the existing UI/design system and APIs where possible
+- Do not break existing datasets, analytics, authentication, or AI features.
+First inspect the existing codebase and implement this end-to-end, including backend APIs, database changes if required, and frontend UI.

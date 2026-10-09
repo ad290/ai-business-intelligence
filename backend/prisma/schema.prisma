@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DatasetFileType {
+  CSV
+  JSON
+}
+
+enum DatasetProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum DocumentFileType {
+  PDF
+  DOCX
+  TXT
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+
+  users     User[]
+  datasets  Dataset[]
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Dataset {
+  id               String           @id @default(uuid())
+  companyId        String
+  name             String
+  originalFileName String
+  fileType         DatasetFileType
+  rowCount            Int
+  columns             Json
+  processedRowCount   Int?
+  processedAt         DateTime?
+  processingStatus    DatasetProcessingStatus @default(PENDING)
+
+  company Company     @relation(fields: [companyId], references: [id])
+  rows    DatasetRow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model DatasetRow {
+  id        String   @id @default(uuid())
+  datasetId String
+  data      Json
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([datasetId])
+}
+
+model Document {
+  id        String @id @default(uuid())
+  companyId String
+  title     String
+  content   String @db.Text
+
+  originalFileName  String?
+  fileType          DocumentFileType?
+  processingStatus  DatasetProcessingStatus @default(COMPLETED)
+  chunkCount        Int?
+  processedAt       DateTime?
+  processingError   String?
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  chunks  DocumentChunk[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model DocumentChunk {
+  id         String @id @default(uuid())
+  documentId String
+  content    String @db.Text
+  /// pgvector column; dimension matches analytics-service `all-MiniLM-L6-v2` (384).
+  embedding  Unsupported("vector(384)")?
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+
+  companyId    String
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  refreshTokens RefreshToken[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// Server-side refresh session. Stores only a hash of the opaque refresh token.
+model RefreshToken {
+  id        String @id @default(uuid())
+  /// SHA-256 (or similar) hash of the issued refresh token — never store plaintext.
+  tokenHash String @unique
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// All tokens issued from one login (including rotations) share a family for reuse detection.
+  familyId String
+
+  expiresAt DateTime
+  /// Set on logout, rotation, or when reuse is detected for the family.
+  revokedAt DateTime?
+  /// When rotated, points to the replacement row; a presented token with this set indicates reuse.
+  replacedById String?
+
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  userAgent String?
+  ipAddress String?
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
